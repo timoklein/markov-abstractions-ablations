@@ -1,11 +1,12 @@
-from collections import namedtuple
 import random
+from collections import namedtuple
 
 import numpy as np
 
 # Adapted from Pytorch docs
 
-Experience = namedtuple('Experience', ('x', 'a', 'r', 'xp', 'done'))
+Experience = namedtuple("Experience", ("x", "a", "r", "xp", "done"))
+
 
 class ReplayMemory:
     def __init__(self, capacity):

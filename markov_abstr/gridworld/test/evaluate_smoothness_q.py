@@ -1,17 +1,17 @@
+import sys
+
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
 import seeding
-import sys
 import torch
 import torch.nn.functional as F
-from tqdm import tqdm
-
-from visgrid.gridworld import GridWorld, MazeWorld, SpiralWorld
-from visgrid.utils import get_parser
-from visgrid.sensors import *
-from gridworld.models.phinet import PhiNet
 from gridworld.agents.dqnagent import DQNAgent
+from gridworld.models.phinet import PhiNet
+from tqdm import tqdm
+from visgrid.gridworld import GridWorld, MazeWorld, SpiralWorld
+from visgrid.sensors import *
+from visgrid.utils import get_parser
 
 parser = get_parser()
 # parser.add_argument('-d','--dims', help='Number of latent dimensions', type=int, default=2)

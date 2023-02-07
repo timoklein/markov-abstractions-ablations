@@ -1,23 +1,19 @@
 from collections import defaultdict
+
 import numpy as np
 import torch
 import torch.nn as nn
 
 from .autoencoder import AutoEncoder
-from .simplenet import SimpleNet
 from .nnutils import one_hot
+from .simplenet import SimpleNet
+
 
 class PixelPredictor(AutoEncoder):
-    def __init__(self,
-                 n_actions,
-                 input_shape=2,
-                 n_latent_dims=4,
-                 n_hidden_layers=1,
-                 n_units_per_layer=32,
-                 lr=0.001,
-                 coefs=None):
-        super().__init__(n_actions, input_shape, n_latent_dims, n_hidden_layers, n_units_per_layer,
-                         lr, coefs)
+    def __init__(
+        self, n_actions, input_shape=2, n_latent_dims=4, n_hidden_layers=1, n_units_per_layer=32, lr=0.001, coefs=None
+    ):
+        super().__init__(n_actions, input_shape, n_latent_dims, n_hidden_layers, n_units_per_layer, lr, coefs)
         self.transition_model = SimpleNet(
             n_inputs=(n_latent_dims + n_actions),
             n_outputs=n_latent_dims,

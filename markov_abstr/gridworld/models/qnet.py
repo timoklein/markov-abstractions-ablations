@@ -2,7 +2,8 @@ import numpy as np
 import torch
 import torch.nn
 
-from .nnutils import Network, one_hot, extract
+from .nnutils import Network, extract, one_hot
+
 
 class QNet(Network):
     def __init__(self, n_features, n_actions, n_hidden_layers=1, n_units_per_layer=32):
@@ -15,8 +16,8 @@ class QNet(Network):
         else:
             self.layers.extend([torch.nn.Linear(n_features, n_units_per_layer), torch.nn.ReLU()])
             self.layers.extend(
-                [torch.nn.Linear(n_units_per_layer, n_units_per_layer),
-                 torch.nn.ReLU()] * (n_hidden_layers - 1))
+                [torch.nn.Linear(n_units_per_layer, n_units_per_layer), torch.nn.ReLU()] * (n_hidden_layers - 1)
+            )
             self.layers.extend([torch.nn.Linear(n_units_per_layer, n_actions)])
 
         self.model = torch.nn.Sequential(*self.layers)

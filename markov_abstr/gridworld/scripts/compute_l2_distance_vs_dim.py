@@ -1,5 +1,5 @@
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 # Result:
 # As dimensionality increases, pairwise distance between points drawn
@@ -20,19 +20,19 @@ for ax_idx, dim in enumerate([100, 50, 10, 3, 2]):
     xj.shape
 
     d = np.linalg.norm(xi - xj, axis=-1, ord=2)
-    axes[0].hist(d, bins=200, label='{}-D'.format(dim))
+    axes[0].hist(d, bins=200, label="{}-D".format(dim))
     print(d.max())
     # axes[0].set_xlabel('{}-D'.format(dim))
-axes[0].legend(loc='upper left')
-axes[0].set_xlabel('Pairwise distance')
+axes[0].legend(loc="upper left")
+axes[0].set_xlabel("Pairwise distance")
 plt.show()
 plt.tight_layout()
 
 
-#%%
+# %%
 y = np.asarray([11.27194881454762, 8.511510681180757, 4.9817514186646035, 3.2767424590093714, 2.7638492360699627])
 x = np.asarray([100, 50, 10, 3, 2])
 plt.plot(x, y)
 plt.plot(x, np.sqrt(x) + 1.7)
-plt.xlabel('D')
-plt.ylabel('maximum distance')
+plt.xlabel("D")
+plt.ylabel("maximum distance")

@@ -1,21 +1,30 @@
-import imageio
 import json
+import os
+import sys
+
+import imageio
+
 #!! do not import matplotlib until you check input arguments
 import numpy as np
-import os
 import seeding
-import sys
 import torch
-from tqdm import tqdm
-
-from models.featurenet import FeatureNet
 from models.autoencoder import AutoEncoder
+from models.featurenet import FeatureNet
 from models.pixelpredictor import PixelPredictor
-from repvis import RepVisualization, CleanVisualization
-from visgrid.gridworld import GridWorld, TestWorld, SnakeWorld, RingWorld, MazeWorld, SpiralWorld, LoopWorld
-from visgrid.utils import get_parser, MI
-from visgrid.sensors import *
+from repvis import CleanVisualization, RepVisualization
+from tqdm import tqdm
+from visgrid.gridworld import (
+    GridWorld,
+    LoopWorld,
+    MazeWorld,
+    RingWorld,
+    SnakeWorld,
+    SpiralWorld,
+    TestWorld,
+)
 from visgrid.gridworld.distance_oracle import DistanceOracle
+from visgrid.sensors import *
+from visgrid.utils import MI, get_parser
 
 parser = get_parser()
 # parser.add_argument('-d','--dims', help='Number of latent dimensions', type=int, default=2)
@@ -68,44 +77,43 @@ parser.add_argument('--rearrange_xy', action='store_true',
                     help='Rearrange discrete x-y positions to break smoothness')
 
 # yapf: enable
-if 'ipykernel' in sys.argv[0]:
-    arglist = [
-        '--spiral', '--tag', 'test-spiral', '-r', '6', '-c', '6', '--L_ora', '1.0', '--video'
-    ]
+if "ipykernel" in sys.argv[0]:
+    arglist = ["--spiral", "--tag", "test-spiral", "-r", "6", "-c", "6", "--L_ora", "1.0", "--video"]
     args = parser.parse_args(arglist)
 else:
     args = parser.parse_args()
 
 if args.no_graphics:
     import matplotlib
+
     # Force matplotlib to not use any Xwindows backend.
-    matplotlib.use('Agg')
+    matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-log_dir = 'results/logs/' + str(args.tag)
-vid_dir = 'results/videos/' + str(args.tag)
-maze_dir = 'results/mazes/' + str(args.tag)
+log_dir = "results/logs/" + str(args.tag)
+vid_dir = "results/videos/" + str(args.tag)
+maze_dir = "results/mazes/" + str(args.tag)
 os.makedirs(log_dir, exist_ok=True)
 
 if args.video:
     os.makedirs(vid_dir, exist_ok=True)
     os.makedirs(maze_dir, exist_ok=True)
-    video_filename = vid_dir + '/video-{}.mp4'.format(args.seed)
-    image_filename = vid_dir + '/final-{}.png'.format(args.seed)
-    maze_file = maze_dir + '/maze-{}.png'.format(args.seed)
+    video_filename = vid_dir + "/video-{}.mp4".format(args.seed)
+    image_filename = vid_dir + "/final-{}.png".format(args.seed)
+    maze_file = maze_dir + "/maze-{}.png".format(args.seed)
 
-log = open(log_dir + '/train-{}.txt'.format(args.seed), 'w')
-with open(log_dir + '/args-{}.txt'.format(args.seed), 'w') as arg_file:
+log = open(log_dir + "/train-{}.txt".format(args.seed), "w")
+with open(log_dir + "/args-{}.txt".format(args.seed), "w") as arg_file:
     arg_file.write(repr(args))
 
 seeding.seed(args.seed)
 
-#% ------------------ Define MDP ------------------
-if args.walls == 'maze':
+# % ------------------ Define MDP ------------------
+if args.walls == "maze":
     env = MazeWorld.load_maze(rows=args.rows, cols=args.cols, seed=args.seed)
-elif args.walls == 'spiral':
+elif args.walls == "spiral":
     env = SpiralWorld(rows=args.rows, cols=args.cols)
-elif args.walls == 'loop':
+elif args.walls == "loop":
     env = LoopWorld(rows=args.rows, cols=args.cols)
 else:
     env = GridWorld(rows=args.rows, cols=args.cols)
@@ -116,7 +124,7 @@ else:
 # cmap = 'Set3'
 cmap = None
 
-#% ------------------ Generate experiences ------------------
+# % ------------------ Generate experiences ------------------
 n_samples = 20000
 states = [env.get_state()]
 actions = []
@@ -143,7 +151,7 @@ if args.video:
 # Confirm that we're covering the state space relatively evenly
 # np.histogram2d(states[:,0], states[:,1], bins=6)
 
-#% ------------------ Define sensor ------------------
+# % ------------------ Define sensor ------------------
 sensor_list = []
 if args.rearrange_xy:
     sensor_list.append(RearrangeXYPositionsSensor((env._rows, env._cols)))
@@ -153,54 +161,60 @@ if not args.no_sigma:
         NoisySensor(sigma=0.05),
         ImageSensor(range=((0, env._rows), (0, env._cols)), pixel_density=3),
         # ResampleSensor(scale=2.0),
-        BlurSensor(sigma=0.6, truncate=1.),
-        NoisySensor(sigma=0.01)
+        BlurSensor(sigma=0.6, truncate=1.0),
+        NoisySensor(sigma=0.01),
     ]
 sensor = SensorChain(sensor_list)
 
 x0 = sensor.observe(s0)
 x1 = sensor.observe(s1)
 
-#% ------------------ Setup experiment ------------------
+# % ------------------ Setup experiment ------------------
 n_updates_per_frame = 100
 n_frames = args.n_updates // n_updates_per_frame
 
 batch_size = args.batch_size
 
 coefs = {
-    'L_inv': args.L_inv,
-    'L_coinv': args.L_coinv,
+    "L_inv": args.L_inv,
+    "L_coinv": args.L_coinv,
     # 'L_fwd': args.L_fwd,
-    'L_rat': args.L_rat,
+    "L_rat": args.L_rat,
     # 'L_fac': args.L_fac,
-    'L_dis': args.L_dis,
-    'L_ora': args.L_ora,
+    "L_dis": args.L_dis,
+    "L_ora": args.L_ora,
 }
 
-if args.type == 'markov':
-    fnet = FeatureNet(n_actions=4,
-                      input_shape=x0.shape[1:],
-                      n_latent_dims=args.latent_dims,
-                      n_hidden_layers=1,
-                      n_units_per_layer=32,
-                      lr=args.learning_rate,
-                      coefs=coefs)
-elif args.type == 'autoencoder':
-    fnet = AutoEncoder(n_actions=4,
-                       input_shape=x0.shape[1:],
-                       n_latent_dims=args.latent_dims,
-                       n_hidden_layers=1,
-                       n_units_per_layer=32,
-                       lr=args.learning_rate,
-                       coefs=coefs)
-elif args.type == 'pixel-predictor':
-    fnet = PixelPredictor(n_actions=4,
-                          input_shape=x0.shape[1:],
-                          n_latent_dims=args.latent_dims,
-                          n_hidden_layers=1,
-                          n_units_per_layer=32,
-                          lr=args.learning_rate,
-                          coefs=coefs)
+if args.type == "markov":
+    fnet = FeatureNet(
+        n_actions=4,
+        input_shape=x0.shape[1:],
+        n_latent_dims=args.latent_dims,
+        n_hidden_layers=1,
+        n_units_per_layer=32,
+        lr=args.learning_rate,
+        coefs=coefs,
+    )
+elif args.type == "autoencoder":
+    fnet = AutoEncoder(
+        n_actions=4,
+        input_shape=x0.shape[1:],
+        n_latent_dims=args.latent_dims,
+        n_hidden_layers=1,
+        n_units_per_layer=32,
+        lr=args.learning_rate,
+        coefs=coefs,
+    )
+elif args.type == "pixel-predictor":
+    fnet = PixelPredictor(
+        n_actions=4,
+        input_shape=x0.shape[1:],
+        n_latent_dims=args.latent_dims,
+        n_hidden_layers=1,
+        n_units_per_layer=32,
+        lr=args.learning_rate,
+        coefs=coefs,
+    )
 
 fnet.print_summary()
 
@@ -221,19 +235,10 @@ obs = sensor.observe(state)
 
 if args.video:
     if not args.cleanvis:
-        repvis = RepVisualization(env,
-                                  obs,
-                                  batch_size=n_test_samples,
-                                  n_dims=2,
-                                  colors=test_c,
-                                  cmap=cmap)
+        repvis = RepVisualization(env, obs, batch_size=n_test_samples, n_dims=2, colors=test_c, cmap=cmap)
     else:
-        repvis = CleanVisualization(env,
-                                    obs,
-                                    batch_size=n_test_samples,
-                                    n_dims=2,
-                                    colors=test_c,
-                                    cmap=cmap)
+        repvis = CleanVisualization(env, obs, batch_size=n_test_samples, n_dims=2, colors=test_c, cmap=cmap)
+
 
 def get_batch(x0, x1, a, batch_size=batch_size):
     idx = np.random.choice(len(a), batch_size, replace=False)
@@ -243,13 +248,14 @@ def get_batch(x0, x1, a, batch_size=batch_size):
     ti = torch.as_tensor(idx).long()
     return tx0, tx1, ta, idx
 
-get_next_batch = (
-    lambda: get_batch(x0[:n_samples // 2, :], x1[:n_samples // 2, :], a[:n_samples // 2]))
+
+get_next_batch = lambda: get_batch(x0[: n_samples // 2, :], x1[: n_samples // 2, :], a[: n_samples // 2])
+
 
 def test_rep(fnet, step):
     with torch.no_grad():
         fnet.eval()
-        if args.type == 'markov':
+        if args.type == "markov":
             z0 = fnet.phi(test_x0)
             z1 = fnet.phi(test_x1)
             # z1_hat = fnet.fwd_model(z0, test_a)
@@ -269,42 +275,46 @@ def test_rep(fnet, step):
                 'MI': MI(test_s0, z0.numpy()) / MI_max
             }
             # yapf: enable
-        elif args.type == 'autoencoder':
+        elif args.type == "autoencoder":
             z0 = fnet.encode(test_x0)
             z1 = fnet.encode(test_x1)
 
             loss_info = {
-                'step': step,
-                'L': fnet.compute_loss(test_x0).numpy().tolist(),
+                "step": step,
+                "L": fnet.compute_loss(test_x0).numpy().tolist(),
             }
 
-        elif args.type == 'pixel-predictor':
+        elif args.type == "pixel-predictor":
             z0 = fnet.encode(test_x0)
             z1 = fnet.encode(test_x1)
 
             loss_info = {
-                'step': step,
-                'L': fnet.compute_loss(test_x0, test_a, test_x1).numpy().tolist(),
+                "step": step,
+                "L": fnet.compute_loss(test_x0, test_a, test_x1).numpy().tolist(),
             }
 
     json_str = json.dumps(loss_info)
-    log.write(json_str + '\n')
+    log.write(json_str + "\n")
     log.flush()
 
-    text = '\n'.join([key + ' = ' + str(val) for key, val in loss_info.items()])
+    text = "\n".join([key + " = " + str(val) for key, val in loss_info.items()])
 
     results = [z0, z1, z1, test_a, test_a]
     return [r.numpy() for r in results] + [text]
 
-#% ------------------ Run Experiment ------------------
+
+# % ------------------ Run Experiment ------------------
 data = []
 for frame_idx in tqdm(range(n_frames + 1)):
     for _ in range(n_updates_per_frame):
         tx0, tx1, ta, idx = get_next_batch()
-        tdist = torch.cat([
-            torch.as_tensor(oracle.pairwise_distances(idx, s0, s1)).squeeze().float(),
-            torch.as_tensor(oracle.pairwise_distances(idx, s0, np.flip(s1))).squeeze().float()
-        ], dim=0) # yapf: disable
+        tdist = torch.cat(
+            [
+                torch.as_tensor(oracle.pairwise_distances(idx, s0, s1)).squeeze().float(),
+                torch.as_tensor(oracle.pairwise_distances(idx, s0, np.flip(s1))).squeeze().float(),
+            ],
+            dim=0,
+        )  # yapf: disable
         # h = np.histogram(tdist, bins=36)[0]
 
         fnet.train_batch(tx0, tx1, ta, tdist)
@@ -319,6 +329,7 @@ if args.video:
     imageio.imwrite(image_filename, data[-1])
 
 if args.save:
-    fnet.phi.save('phi-{}'.format(args.seed), 'results/models/{}'.format(args.tag))
+    torch.save(fnet.state_dict(), "test_model.pt")
+    fnet.phi.save("phi-{}".format(args.seed), "results/models/{}".format(args.tag))
 
 log.close()

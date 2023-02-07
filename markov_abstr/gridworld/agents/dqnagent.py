@@ -1,27 +1,31 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
-
+from models.nnutils import extract, one_hot
 from models.qnet import QNet
-from models.nnutils import one_hot, extract
-from .replaymemory import ReplayMemory, Experience
+
+from .replaymemory import Experience, ReplayMemory
+
 
 def tch(tensor, dtype=torch.float32):
     return list(map(lambda x: torch.tensor(x, dtype=dtype), tensor))
 
-class DQNAgent():
-    def __init__(self,
-                 n_features,
-                 n_actions,
-                 phi,
-                 lr=0.001,
-                 epsilon=0.05,
-                 batch_size=16,
-                 train_phi=False,
-                 n_hidden_layers=1,
-                 n_units_per_layer=32,
-                 gamma=0.9,
-                 factored=False):
+
+class DQNAgent:
+    def __init__(
+        self,
+        n_features,
+        n_actions,
+        phi,
+        lr=0.001,
+        epsilon=0.05,
+        batch_size=16,
+        train_phi=False,
+        n_hidden_layers=1,
+        n_units_per_layer=32,
+        gamma=0.9,
+        factored=False,
+    ):
         self.n_features = n_features
         self.n_actions = n_actions
         self.n_hidden_layers = n_hidden_layers
@@ -41,14 +45,18 @@ class DQNAgent():
 
     def reset(self):
         self.n_training_steps = 0
-        self.q = self.make_qnet(n_features=self.n_features,
-                                n_actions=self.n_actions,
-                                n_hidden_layers=self.n_hidden_layers,
-                                n_units_per_layer=self.n_units_per_layer)
-        self.q_target = self.make_qnet(n_features=self.n_features,
-                                       n_actions=self.n_actions,
-                                       n_hidden_layers=self.n_hidden_layers,
-                                       n_units_per_layer=self.n_units_per_layer)
+        self.q = self.make_qnet(
+            n_features=self.n_features,
+            n_actions=self.n_actions,
+            n_hidden_layers=self.n_hidden_layers,
+            n_units_per_layer=self.n_units_per_layer,
+        )
+        self.q_target = self.make_qnet(
+            n_features=self.n_features,
+            n_actions=self.n_actions,
+            n_hidden_layers=self.n_hidden_layers,
+            n_units_per_layer=self.n_units_per_layer,
+        )
         self.copy_target_net()
         self.replay.reset()
         params = list(self.q.parameters()) + list(self.phi.parameters())
@@ -60,7 +68,7 @@ class DQNAgent():
         return self.epsilon * alpha + 1 * (1 - alpha)
 
     def act(self, x):
-        if (len(self.replay) < self.n_steps_init or np.random.uniform() < self.get_epsilon()):
+        if len(self.replay) < self.n_steps_init or np.random.uniform() < self.get_epsilon():
             a = np.random.randint(self.n_actions)
         else:
             with torch.no_grad():
@@ -81,7 +89,7 @@ class DQNAgent():
             ap = torch.argmax(self.q(zp), dim=-1)
             vp = self.q_target(zp).gather(-1, ap.unsqueeze(-1)).squeeze(-1)
             # vp = torch.max(self.q(zp),dim=-1)[0]
-            not_done_idx = (1 - torch.stack(tch(batch.done)))
+            not_done_idx = 1 - torch.stack(tch(batch.done))
             targets = torch.stack(tch(batch.r)) + self.gamma * vp * not_done_idx
 
         return targets
