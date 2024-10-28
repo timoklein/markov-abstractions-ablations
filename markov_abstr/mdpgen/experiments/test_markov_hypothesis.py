@@ -1,14 +1,22 @@
 import gmpy
 import numpy as np
+from mdpgen.markov import (
+    generate_markov_mdp_pair,
+    generate_non_markov_mdp_pair,
+    is_markov,
+)
+from mdpgen.mdp import MDP, AbstractMDP, UniformAbstractMDP
+from mdpgen.value_fn import (
+    compare_value_fns,
+    graph_value_fns,
+    partial_ordering,
+    sort_value_fns,
+    sorted_order,
+)
+from mdpgen.vi import vi
 from tqdm import tqdm
 
-from mdpgen.mdp import MDP, AbstractMDP, UniformAbstractMDP
-from mdpgen.vi import vi
-from mdpgen.markov import generate_markov_mdp_pair, generate_non_markov_mdp_pair, is_markov
-
-from mdpgen.value_fn import compare_value_fns, partial_ordering, sorted_order, sort_value_fns, graph_value_fns
-
-#%%
+# %%
 for _ in tqdm(range(100)):
     # Generate (MDP, abstract MDP) pair
     # mdp1, mdp2 = generate_non_markov_mdp_pair(
@@ -16,9 +24,12 @@ for _ in tqdm(range(100)):
     #     fixed_w=True,
     # )
     mdp1, mdp2 = generate_markov_mdp_pair(
-        n_states=5, n_abs_states=3, n_actions=2, sparsity=.7,
-        equal_block_rewards = True,
-        equal_block_transitions = True,
+        n_states=5,
+        n_abs_states=3,
+        n_actions=2,
+        sparsity=0.7,
+        equal_block_rewards=True,
+        equal_block_transitions=True,
     )
     mdp2.phi
     is_markov(mdp2)
@@ -62,28 +73,31 @@ for _ in tqdm(range(100)):
 
     for v in v_g_list:
         if compare_value_fns(v_pi_phi_star, v) == "<":
-            print('Inconsistent value ordering')
+            print("Inconsistent value ordering")
             break
     else:
         if compare_value_fns(v_pi_phi_star, v_star) == "<":
-            print('Found example that was non π*-preserving.')
+            print("Found example that was non π*-preserving.")
             break
         continue
     break
 else:
-    print('No examples found.')
+    print("No examples found.")
 
 # #%%
 graph_value_fns(v_g_list)
 graph_value_fns(v_a_list)
 
-#%%
+# %%
 v_pi_phi_star
 np.asarray(sort_value_fns(v_g_list)).round(3)
 
-#%%
+# %%
 mdp3, mdp4 = generate_markov_mdp_pair(
-    n_states=3, n_abs_states=2, n_actions=2, sparsity=1,
-    equal_block_rewards = False,
-    equal_block_transitions = False,
+    n_states=3,
+    n_abs_states=2,
+    n_actions=2,
+    sparsity=1,
+    equal_block_rewards=False,
+    equal_block_transitions=False,
 )

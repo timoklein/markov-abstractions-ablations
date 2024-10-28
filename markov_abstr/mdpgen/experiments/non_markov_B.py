@@ -1,42 +1,58 @@
 import gmpy
 import numpy as np
+from mdpgen.markov import (
+    generate_markov_mdp_pair,
+    generate_non_markov_mdp_pair,
+    is_markov,
+)
+from mdpgen.mdp import MDP, AbstractMDP, UniformAbstractMDP
+from mdpgen.value_fn import (
+    compare_value_fns,
+    graph_value_fns,
+    partial_ordering,
+    sort_value_fns,
+    sorted_order,
+)
+from mdpgen.vi import vi
 from tqdm import tqdm
 
-from mdpgen.mdp import MDP, AbstractMDP, UniformAbstractMDP
-from mdpgen.vi import vi
-from mdpgen.markov import generate_markov_mdp_pair, generate_non_markov_mdp_pair, is_markov
-
-from mdpgen.value_fn import compare_value_fns, partial_ordering, sorted_order, sort_value_fns, graph_value_fns
-
-
-#%%
+# %%
 # Try MDP pair with non-Markov belief
-T = np.array([
-    [0, .5, .5, 0, 0, 0],
-    [0, 0, 0, .5, .5, 0],
-    [0, 0, 0, 0, .5, .5],
-    [1, 0, 0, 0, 0, 0],
-    [1, 0, 0, 0, 0, 0],
-    [1, 0, 0, 0, 0, 0],
-])
-R = np.array([
-    [0, 1, 1, 0, 0, 0],
-    [0, 0, 0, 2, 2, 0],
-    [0, 0, 0, 0, 2, 2],
-    [2, 0, 0, 0, 0, 0],
-    [3, 0, 0, 0, 0, 0],
-    [4, 0, 0, 0, 0, 0]
-])/4
+T = np.array(
+    [
+        [0, 0.5, 0.5, 0, 0, 0],
+        [0, 0, 0, 0.5, 0.5, 0],
+        [0, 0, 0, 0, 0.5, 0.5],
+        [1, 0, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0],
+    ]
+)
+R = (
+    np.array(
+        [
+            [0, 1, 1, 0, 0, 0],
+            [0, 0, 0, 2, 2, 0],
+            [0, 0, 0, 0, 2, 2],
+            [2, 0, 0, 0, 0, 0],
+            [3, 0, 0, 0, 0, 0],
+            [4, 0, 0, 0, 0, 0],
+        ]
+    )
+    / 4
+)
 
 mdp1 = MDP([T, T], [R, R], gamma=0.9)
-phi = np.array([
-    [1, 0, 0, 0],
-    [0, 1, 0, 0],
-    [0, 0, 1, 0],
-    [0, 0, 0, 1],
-    [0, 0, 0, 1],
-    [0, 0, 0, 1],
-])
+phi = np.array(
+    [
+        [1, 0, 0, 0],
+        [0, 1, 0, 0],
+        [0, 0, 1, 0],
+        [0, 0, 0, 1],
+        [0, 0, 0, 1],
+        [0, 0, 0, 1],
+    ]
+)
 mdp2 = AbstractMDP(mdp1, phi)
 
 v_star, q_star, pi_star = vi(mdp1)

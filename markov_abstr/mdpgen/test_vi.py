@@ -1,7 +1,7 @@
 import numpy as np
-
 from mdpgen.mdp import MDP, BlockMDP
 from mdpgen.vi import vi
+
 
 def main():
     mdp = BlockMDP(MDP.generate(n_states=5, n_actions=6), n_obs_per_block=3)
@@ -18,9 +18,10 @@ def main():
 
     m_phi = mdp.base_mdp
     v_phi, q_phi, pi_phi = vi(m_phi)
-    pi_phi_grounded = np.kron(pi_phi, np.ones((1,mdp.n_states//m_phi.n_states)))
+    pi_phi_grounded = np.kron(pi_phi, np.ones((1, mdp.n_states // m_phi.n_states)))
     assert np.allclose(pi_phi_grounded, pi)
-    print('All tests passed.')
+    print("All tests passed.")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

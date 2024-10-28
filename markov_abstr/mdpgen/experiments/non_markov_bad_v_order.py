@@ -1,39 +1,27 @@
 import gmpy
 import numpy as np
+from mdpgen.markov import (
+    generate_markov_mdp_pair,
+    generate_non_markov_mdp_pair,
+    is_markov,
+)
+from mdpgen.mdp import MDP, AbstractMDP, UniformAbstractMDP
+from mdpgen.value_fn import (
+    compare_value_fns,
+    graph_value_fns,
+    partial_ordering,
+    sort_value_fns,
+    sorted_order,
+)
+from mdpgen.vi import vi
 from tqdm import tqdm
 
-from mdpgen.mdp import MDP, AbstractMDP, UniformAbstractMDP
-from mdpgen.vi import vi
-from mdpgen.markov import generate_markov_mdp_pair, generate_non_markov_mdp_pair, is_markov
-
-from mdpgen.value_fn import compare_value_fns, partial_ordering, sorted_order, sort_value_fns, graph_value_fns
-
-#%%
+# %%
 # This illustrates an example where V^{\pi_\phi^*} < max_{\pi\in \Pi_\phi} V^{\pi}
 # Note the fixed weighting scheme.
-T_list = np.array([
-    [[1., 0., 0.],
-     [1., 0., 0.],
-     [0., 0., 1.]],
-
-    [[0., 1., 0.],
-     [0., 0., 1.],
-     [0., 1., 0.]]
-])
-R_list = np.array([
-   [[1.,  0., 0.],
-    [0.5, 0., 0.],
-    [0.,  0., 0.5]],
-
-   [[0., 1.,  0.],
-    [0., 0.,  1.],
-    [0., 0.1, 0.]]
-])
-phi = np.array([
-    [0, 1],
-    [1, 0],
-    [0, 1]
-])
+T_list = np.array([[[1.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]], [[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]]])
+R_list = np.array([[[1.0, 0.0, 0.0], [0.5, 0.0, 0.0], [0.0, 0.0, 0.5]], [[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.1, 0.0]]])
+phi = np.array([[0, 1], [1, 0], [0, 1]])
 
 mdp1 = MDP(T_list, R_list, gamma=0.9)
 mdp2 = UniformAbstractMDP(mdp1, phi)
@@ -55,9 +43,9 @@ for v in v_g_list:
     if compare_value_fns(v_pi_phi_star, v) == "<":
         break
 else:
-    print('No examples found.')
+    print("No examples found.")
 
-#%%
+# %%
 graph_value_fns(v_g_list)
 graph_value_fns(v_a_list)
 
@@ -66,32 +54,12 @@ np.asarray(v_g_list).round(3)
 np.asarray(v_a_list).round(3)
 
 
-#%%
+# %%
 # This illustrates an example where V^{\pi_\phi^*} < max_{\pi\in \Pi_\phi} V^{\pi}
 # Note the fixed weighting scheme.
-T_list = np.array([
-    [[1., 0., 0.],
-     [1., 0., 0.],
-     [0., 0., 1.]],
-
-    [[0., 1., 0.],
-     [0., 0., 1.],
-     [0., 1., 0.]]
-])
-R_list = np.array([
-   [[1.,  0., 0.],
-    [0.5, 0., 0.],
-    [0.,  0., 0.5]],
-
-   [[0., 1.,  0.],
-    [0., 0.,  1.],
-    [0., 0.1, 0.]]
-])
-phi = np.array([
-    [0, 1],
-    [1, 0],
-    [0, 1]
-])
+T_list = np.array([[[1.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]], [[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]]])
+R_list = np.array([[[1.0, 0.0, 0.0], [0.5, 0.0, 0.0], [0.0, 0.0, 0.5]], [[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.1, 0.0]]])
+phi = np.array([[0, 1], [1, 0], [0, 1]])
 
 mdp1 = MDP(T_list, R_list, gamma=0.9)
 mdp2 = AbstractMDP(mdp1, phi)
@@ -113,11 +81,11 @@ for v in v_g_list:
     if compare_value_fns(v_pi_phi_star, v) == "<":
         break
 else:
-    print('No examples found.')
+    print("No examples found.")
 
-#%%
-graph_value_fns(v_g_list, 'bad_v_order_gnd')
-graph_value_fns(v_a_list, 'bad_v_order_abs')
+# %%
+graph_value_fns(v_g_list, "bad_v_order_gnd")
+graph_value_fns(v_a_list, "bad_v_order_abs")
 
 
 v_pi_phi_star

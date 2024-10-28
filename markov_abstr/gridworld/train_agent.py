@@ -1,16 +1,18 @@
+import random
 import argparse
 import json
 import os
 from typing import Union
 
 #!! do not import matplotlib until you check input arguments
+import wandb
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import seeding
+from agents.a2cagent import DiscreteA2CAgent
+from agents.reinforceagent import DiscreteReinforceAgent
 from agents.dqnagent import DQNAgent
 from agents.randomagent import RandomAgent
-from models.nnutils import Reshape
 from models.nullabstraction import NullAbstraction
 from models.phinet import PhiNet
 from tqdm import tqdm
@@ -24,7 +26,6 @@ from visgrid.gridworld import (
     TestWorld,
 )
 from visgrid.sensors import *
-from visgrid.utils import get_parser
 
 GAMMA: float = 0.9
 
@@ -35,48 +36,60 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     # parser.add_argument('-d','--dims', help='Number of latent dimensions', type=int, default=2)
     # yapf: disable
-    parser.add_argument('-a','--agent', type=str, required=True,
-                        choices=['random','dqn'], help='Type of agent to train')
-    parser.add_argument('-n','--n_trials', type=int, default=1,
-                        help='Number of trials')
-    parser.add_argument('-e','--n_episodes', type=int, default=10,
-                        help='Number of episodes per trial')
-    parser.add_argument('-m','--max_steps', type=int, default=1000,
-                        help='Maximum number of steps per episode')
-    parser.add_argument('-r','--rows', type=int, default=6,
-                        help='Number of gridworld rows')
-    parser.add_argument('-c','--cols', type=int, default=6,
-                        help='Number of gridworld columns')
-    parser.add_argument('-w', '--walls', type=str, default='empty', choices=['empty', 'maze', 'spiral', 'loop'],
-                        help='The wall configuration mode of gridworld')
-    parser.add_argument('-b','--batch_size', type=int, default=16,
-                        help='Number of experiences to sample per batch')
-    parser.add_argument('-l','--latent_dims', type=int, default=2,
-                        help='Number of latent dimensions to use for representation')
-    parser.add_argument('-lr','--learning_rate', type=float, default=0.003,
-                        help='Learning rate for Adam optimizer')
-    parser.add_argument('-s','--seed', type=int, default=0,
-                        help='Random seed')
-    parser.add_argument('-t','--tag', type=str, required=True,
-                        help='Tag for identifying experiment')
-    parser.add_argument('--phi_path', type=str,
-                        help='Load an existing abstraction network by tag')
-    parser.add_argument('--no_phi', action='store_true',
-                        help='Turn off abstraction and just use observed state; i.e. ϕ(x)=x')
-    parser.add_argument('--train_phi', action='store_true',
-                        help='Allow simultaneous training of abstraction')
-    parser.add_argument('--no_sigma', action='store_true',
-                        help='Turn off sensors and just use true state; i.e. x=s')
-    parser.add_argument('--one_hot', action='store_true',
-                        help='Bypass sensor and use one-hot representation instead')
-    parser.add_argument('--save', action='store_true',
-                        help='Save final network weights')
-    parser.add_argument('-v','--video', action='store_true',
-                        help='Show video of agent training')
-    parser.add_argument('--xy_noise', action='store_true',
-                        help='Add truncated gaussian noise to x-y positions')
-    parser.add_argument('--rearrange_xy', action='store_true',
-                        help='Rearrange discrete x-y positions to break smoothness')
+    parser.add_argument("-a","--agent", type=str, required=True,
+                        choices=["random","dqn", "reinforce", "a2c"], help="Type of agent to train")
+    parser.add_argument("-n","--n_trials", type=int, default=1,
+                        help="Number of trials")
+    parser.add_argument("-e","--n_episodes", type=int, default=100,
+                        help="Number of episodes per trial")
+    parser.add_argument("-m","--max_steps", type=int, default=1000,
+                        help="Maximum number of steps per episode")
+    parser.add_argument("-r","--rows", type=int, default=6,
+                        help="Number of gridworld rows")
+    parser.add_argument("-c","--cols", type=int, default=6,
+                        help="Number of gridworld columns")
+    parser.add_argument("-w", "--walls", type=str, default="empty", choices=["empty", "maze", "spiral", "loop"],
+                        help="The wall configuration mode of gridworld")
+    parser.add_argument("-b","--batch_size", type=int, default=16,
+                        help="Number of experiences to sample per batch")
+    parser.add_argument("-l","--latent_dims", type=int, default=2,
+                        help="Number of latent dimensions to use for representation")
+    parser.add_argument("-lr","--learning_rate", type=float, default=0.001,
+                        help="Learning rate for Adam optimizer")
+    parser.add_argument("--use_gae", action="store_true",
+                        help="Toggle between GAE and n-step returns in A2C")
+    parser.add_argument("--n_steps", type=int, default=5,
+                        help="Number of steps for n-step returns in A2C")
+    parser.add_argument("--gae_lambda", type=float, default=1.0,
+                        help="Lambda hyperparameter for generalized advantage estimation in A2C")
+    parser.add_argument("--alpha", type=float, default=0.0,
+                        help="Entropy regularization for REINFORCE/A2C")
+    parser.add_argument("--center_returns", type=bool, default=True,
+                        help="Return centering for REINFORCE")
+    parser.add_argument("-s","--seed", type=int, default=0,
+                        help="Random seed")
+    parser.add_argument("-t","--tag", type=str, required=True,
+                        help="Tag for identifying experiment")
+    parser.add_argument("--phi_path", type=str,
+                        help="Load an existing abstraction network by tag")
+    parser.add_argument("--no_phi", action="store_true",
+                        help="Turn off abstraction and just use observed state; i.e. ϕ(x)=x")
+    parser.add_argument("--train_phi", action="store_true",
+                        help="Allow simultaneous training of abstraction")
+    parser.add_argument("--no_sigma", action="store_true",
+                        help="Turn off sensors and just use true state; i.e. x=s")
+    parser.add_argument("--one_hot", action="store_true",
+                        help="Bypass sensor and use one-hot representation instead")
+    parser.add_argument("--save", action="store_true",
+                        help="Save final network weights")
+    parser.add_argument("-v","--video", action="store_true",
+                        help="Show video of agent training")
+    parser.add_argument("--xy_noise", action="store_true",
+                        help="Add truncated gaussian noise to x-y positions")
+    parser.add_argument("--rearrange_xy", action="store_true",
+                        help="Rearrange discrete x-y positions to break smoothness")
+    parser.add_argument("--wandb", action="store_true",
+                        help="Enable wandb logging")
     # yapf: enable
     args = parser.parse_args()
     if args.train_phi and args.no_phi:
@@ -137,7 +150,7 @@ def load_agent(args: argparse.Namespace, sensor: SensorChain, env: GridWorld) ->
         x0 = sensor.observe(env.get_state())
         phinet = PhiNet(input_shape=x0.shape, n_latent_dims=args.latent_dims, n_hidden_layers=1, n_units_per_layer=32)
         if args.phi_path:
-            modelfile = "results/models/{}/phi-{}_latest.pytorch".format(args.phi_path, args.seed)
+            modelfile = f"results/models/{args.phi_path}/phi-{0}_latest.pytorch"
             phinet.load(modelfile)
     n_actions = 4
     if args.agent == "random":
@@ -153,15 +166,43 @@ def load_agent(args: argparse.Namespace, sensor: SensorChain, env: GridWorld) ->
             gamma=GAMMA,
             factored=False,
         )
-        import ipdb; ipdb.set_trace(context=21)
+    elif args.agent == "reinforce":
+        agent = DiscreteReinforceAgent(
+            n_features=args.latent_dims,
+            n_actions=n_actions,
+            phi=phinet,
+            lr=args.learning_rate,
+            train_phi=args.train_phi,
+            gamma=GAMMA,
+            alpha=args.alpha,
+            center_returns=args.center_returns,
+        )
+    elif args.agent == "a2c":
+        agent = DiscreteA2CAgent(
+            n_features=args.latent_dims,
+            n_actions=n_actions,
+            phi=phinet,
+            lr=args.learning_rate,
+            train_phi=args.train_phi,
+            gamma=GAMMA,
+            alpha=args.alpha,
+            use_gae=args.use_gae,
+            gae_lambda=args.gae_lambda,
+            n_steps=args.n_steps,
+        )
+
     else:
-        assert False, "Invalid agent type: {}".format(args.agent)
+        assert False, f"Invalid agent type: {args.agent}"
 
     return agent
 
 
 def main(args: argparse.Namespace) -> None:
-    seeding.seed(args.seed, np)
+
+    # Seeding
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
 
     log, env, sensor = load_environment(args)
     agent = load_agent(args, sensor, env)
@@ -196,7 +237,12 @@ def main(args: argparse.Namespace) -> None:
             )
             ax.invert_yaxis()
 
+    wandb.init(
+        project="grid_representations", name=args.agent, config=vars(args), mode="online" if args.wandb else "disabled"
+    )
+
     for trial in tqdm(range(args.n_trials), desc="trials"):
+        # Set a random position for the goal
         env.reset_goal()
         agent.reset()
         total_reward = 0
@@ -205,6 +251,7 @@ def main(args: argparse.Namespace) -> None:
         rewards = []
         value_fn = []
         for episode in tqdm(range(args.n_episodes), desc="episodes"):
+            # Reset the agent to a random position
             env.reset_agent()
             ep_rewards = []
             for step in range(args.max_steps):
@@ -215,15 +262,25 @@ def main(args: argparse.Namespace) -> None:
                 sp, r, done = env.step(a)
                 xp = sensor.observe(sp)
                 ep_rewards.append(r)
-                if args.video:
+                if args.video and isinstance(agent, DQNAgent):
                     value_fn.append(agent.v(x))
                 total_reward += r
 
-                loss = agent.train(x, a, r, xp, done)
-                losses.append(loss)
+                if isinstance(agent, DiscreteReinforceAgent):
+                    agent.replay.add_experience(x, a, r, done)
+                elif isinstance(agent, DiscreteA2CAgent):
+                    agent.buffer.add_experience(x, a, r, xp, done)
+                    if step > 0 and step % agent.n_steps == 0:
+                        loss = agent.train()
+                else:
+                    loss = agent.train(x, a, r, xp, done)
+                    losses.append(loss)
                 rewards.append(r)
 
                 if done:
+                    if isinstance(agent, DiscreteReinforceAgent):
+                        loss = agent.train()
+                        losses.append(loss)
                     break
 
             if args.video:
@@ -247,6 +304,7 @@ def main(args: argparse.Namespace) -> None:
                 "total_steps": total_steps,
                 "steps": step,
             }
+            wandb.log(score_info)
             json_str = json.dumps(score_info)
             log.write(json_str + "\n")
             log.flush()
